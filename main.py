@@ -11,7 +11,7 @@ from src.data.preprocessing import AudioTransform
 from src.models.vae import VAE
 from src.models.vit import ViT
 # Assuming you saved the hybrid version in hybrid.py as discussed
-from src.models.hybrid import ViT as HybridViT 
+from src.models.hybrid import ViT as HybridViT
 from src.utils.visualizations import get_base64_visual
 
 
@@ -26,6 +26,8 @@ MODEL_REGISTRY = {
 
 def load_trained_model(machine_type, device):
     """Dynamically loads the correct model architecture and weights."""
+    machine_type = machine_type.lower().strip()
+    
     if machine_type not in MODEL_REGISTRY:
         raise ValueError(f"Machine type '{machine_type}' not supported.")
     
@@ -35,20 +37,41 @@ def load_trained_model(machine_type, device):
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found at {model_path}")
 
-    # Initialize the specific model class
-    # Using your last successful config parameters as defaults
+    # --- ARCHITECTURE INITIALIZATION ---
     if machine_type == "slider":
+        # Standard VAE parameters
         model = reg["class"](latent_dim=128)
+        
     elif machine_type == "valve":
-        model = reg["class"](latent_dim=256, embed_dim=384)
-    else: # Fans and Pumps (ViT)
-        model = reg["class"](latent_dim=256, embed_dim=384, depth=6, heads=12)
+        # Valve MUST match the Hybrid parameters from config.yaml
+        model = reg["class"](
+            latent_dim=256, 
+            embed_dim=384, 
+            depth=4,   # <--- Match your 'Hybrid' training run
+            heads=12   # <--- Match your 'Hybrid' training run
+        )
+        
+    else: # fan and pump
+        # Standard ViT parameters
+        model = reg["class"](
+            latent_dim=256, 
+            embed_dim=384, 
+            depth=6,   # <--- Match your 'ViT' training run
+            heads=12
+        )
 
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model.to(device)
-    model.eval()
-    return model
-
+    # Load weights
+    try:
+        # map_location handles moving from Kaggle GPU to your PC CPU/GPU
+        state_dict = torch.load(model_path, map_location=device)
+        model.load_state_dict(state_dict)
+        model.to(device)
+        model.eval()
+        return model
+    except Exception as e:
+        print(f"FAILED TO LOAD {machine_type.upper()} MODEL: {str(e)}")
+        raise e
+    
 def predict(audio_path, machine_type):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     waveform, sr = librosa.load(audio_path, sr=16000)
