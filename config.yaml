@@ -1,0 +1,22 @@
+data:
+  machine_type: "fan"     
+  machine_id: "id_00"
+  snr_level: 0
+  batch_size: 32
+  sample_rate: 16000
+  n_mels: 128
+  hop_length: 512
+
+model:
+  type: "vit"
+  latent_dim: 256
+  embed_dim: 384
+  depth: 4
+  heads: 12       
+
+train:
+  lr: 0.0002
+  epochs: 200
+  early_stopping_patience: 50
+  device: "cuda"
+  save_path: "best_hybrid_model.pth"
